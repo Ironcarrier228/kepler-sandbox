@@ -17,11 +17,12 @@ namespace Kepler.Editor
         [MenuItem("Tools/Verify Space Game")]
         public static void Verify()
         {
-            var f = UnityEngine.Object.FindFirstObjectByType<Flight>();
+            var f = UnityEngine.Object.FindAnyObjectByType<Flight>();
             Check(f != null, "Сначала откройте сцену SolarFlight (Tools → Build Space Game)");
             Check(f.bodies.Length == 10 && f.globes.Length == 10, "Body catalogue");
             Check(f.rig.distant.GetUniversalAdditionalCameraData().cameraStack.Contains(f.rig.local),
                   "Camera stack");
+            Check(f.rig.local.GetUniversalAdditionalCameraData().clearDepth, "Overlay depth clear");
             Check((f.rig.local.cullingMask & f.rig.distant.cullingMask) == 0, "Camera layers overlap");
             foreach (string id in new[] { "Throttle", "Pitch", "Yaw", "Roll", "Cut", "View", "Target",
                                           "Restart", "Pause" })
@@ -69,7 +70,7 @@ namespace Kepler.Editor
                 w.Velocity[1] = new double3(0, 0, v);
                 w.SampleGravity();
                 const int steps = 4096;
-                double dt = 2 * math.PI_D * radius / v / steps, maxDrift = 0;
+                double dt = 2 * System.Math.PI * radius / v / steps, maxDrift = 0;
                 for (int i = 0; i < steps; i++)
                 {
                     w.Step(dt, 0);

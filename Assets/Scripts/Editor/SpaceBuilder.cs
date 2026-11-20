@@ -235,7 +235,7 @@ namespace Kepler.Editor
             rig.distant.clearFlags = CameraClearFlags.Skybox;
             rig.local = Make("Ship space", local, .05f, 5000);
             rig.local.GetUniversalAdditionalCameraData().renderType = CameraRenderType.Overlay;
-            rig.local.GetUniversalAdditionalCameraData().clearDepth = true;
+            // New URP overlay cameras clear depth by default (clearDepth is read-only).
             rig.distant.GetUniversalAdditionalCameraData().cameraStack.Add(rig.local);
             rig.local.gameObject.AddComponent<AudioListener>();
             rig.sun = Node("Sol light").AddComponent<Light>();

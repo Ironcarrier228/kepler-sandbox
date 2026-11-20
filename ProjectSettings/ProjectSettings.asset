@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 27
+  productGUID: efd1b7391a4c492e81567abfb9d32193
+  companyName: Kepler Flight Lab
+  productName: Kepler Solar Flight
+  bundleVersion: 0.1.0
+  defaultScreenWidth: 1280
+  defaultScreenHeight: 720
+  runInBackground: 1
+  activeInputHandler: 1
+  m_ActiveColorSpace: 1

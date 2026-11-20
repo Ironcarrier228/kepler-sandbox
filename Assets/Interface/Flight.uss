@@ -1,0 +1,12 @@
+#screen { flex-grow: 1; color: rgb(224,238,243); font-size: 16px; }
+.header,.footer,.row { flex-direction: row; justify-content: space-between; align-items: center; }
+.header { margin: 25px 34px; padding-bottom: 12px; border-bottom-width: 1px; border-bottom-color: rgba(145,210,212,0.42); }
+.kicker,.clock { font-size: 13px; color: rgb(109,231,207); -unity-font-style: bold; }
+.title { font-size: 26px; -unity-font-style: bold; }
+.reticle { position:absolute; top:48%; left:50%; font-size:24px; color:white; }
+.bottom { position:absolute; left:34px; right:34px; bottom:83px; align-items:flex-end; }
+.panel { background-color:rgba(9,20,31,0.90); padding:15px 20px; border-left-width: 3px; border-left-color: rgb(83,215,192); }
+.telemetry { width:300px; } .navigation { width:240px; } .name { font-size:26px; -unity-font-style:bold; margin-top:4px; margin-bottom:5px; }
+.track { margin-top:6px; height:4px; background-color:rgb(43,69,80); } #bar {height:4px;background-color:rgb(110,234,202);}
+.footer { position:absolute; bottom:0; left:0; right:0; padding:9px 32px; background-color:rgba(8,16,26,0.92); }
+Button { background-color:rgb(25,49,60); color:rgb(222,242,242); border-width:0; border-radius:3px; padding:6px 12px; margin:4px 2px; } Button:hover {background-color:rgb(37,86,93);} #guide { font-size:14px; white-space:normal; flex-shrink:1; }

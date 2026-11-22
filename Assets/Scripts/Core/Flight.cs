@@ -8,6 +8,10 @@ namespace Kepler
     {
         public FlightSettings settings;
         public ShipData vessel;
+        public ModuleData[] modules;
+        public ShipAssembly Assembly { get; private set; }
+        Transform assembledVisual;
+        public double CurrentThrust { get; private set; }
         public BodyData[] bodies;
         public Transform[] globes;
         public Transform ship, plume;
@@ -34,9 +38,16 @@ namespace Kepler
         {
             if (index >= 0 && index < Craft && !Warping) Target = index;
         }
+        public double WarpFuelCost(int index)
+        {
+            double distance = math.distance(World.Position[Craft], World.Position[index]);
+            return 50 + distance / 1e10 * .1;
+        }
+        public bool CanWarp => Assembly.HasWarp && Assembly.Fuel >= WarpFuelCost(Target) && !Warping && !Paused && !Impact;
         public bool StartWarp()
         {
-            if (Warping || Paused || Impact) return false;
+            if (!CanWarp) return false;
+            Assembly.TakeFuel(WarpFuelCost(Target));
             warpTarget = Target;
             warpStart = World.Position[Craft];
             warpDirection = math.normalizesafe(warpStart - World.Position[warpTarget], new double3(1, 0, 0));
@@ -74,6 +85,8 @@ namespace Kepler
         InputActionMap map;
         void Awake()
         {
+            Assembly = new ShipAssembly(modules);
+            BuildShipVisual();
             World = new GravityWorld(Craft + 1);
             previous = new double3[Craft + 1];
             map = controls.FindActionMap("Flight", true);
@@ -100,8 +113,51 @@ namespace Kepler
         {
             World?.Dispose();
         }
+        public void ApplyLayout(ShipLayout layout)
+        {
+            Assembly.Apply(layout, true);
+            BuildShipVisual();
+            Restart();
+        }
+        void BuildShipVisual()
+        {
+            if (assembledVisual) Destroy(assembledVisual.gameObject);
+            foreach (Transform child in ship)
+                if (child != plume) child.gameObject.SetActive(false);
+            var material = ship.GetComponentInChildren<Renderer>(true).sharedMaterial;
+            assembledVisual = new GameObject("Modular ship").transform;
+            assembledVisual.SetParent(ship, false);
+            int count = Assembly.Layout.modules.Count;
+            for (int i = 0; i < count; i++)
+            {
+                ModuleData part = Assembly.Find(Assembly.Layout.modules[i]);
+                var piece = GameObject.CreatePrimitive(part.kind == ModuleKind.Cockpit ? PrimitiveType.Sphere : PrimitiveType.Cylinder);
+                piece.name = part.displayName;
+                piece.layer = ship.gameObject.layer;
+                piece.transform.SetParent(assembledVisual, false);
+                piece.transform.localPosition = new Vector3(0, 0, (count - 1) * .6f - i * 1.2f);
+                if (part.kind == ModuleKind.Cockpit) piece.transform.localScale = new Vector3(1.4f, 1.4f, 1.7f);
+                else
+                {
+                    piece.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                    float width = part.kind == ModuleKind.Engine ? .8f : 1.25f;
+                    piece.transform.localScale = new Vector3(width, .55f, width);
+                }
+                Destroy(piece.GetComponent<Collider>());
+                var renderer = piece.GetComponent<Renderer>();
+                renderer.sharedMaterial = material;
+                var properties = new MaterialPropertyBlock();
+                properties.SetColor("_BaseColor", part.color);
+                renderer.SetPropertyBlock(properties);
+            }
+            plume.localPosition = new Vector3(0, 0, -count * .6f);
+            int n = 0;
+            foreach (Transform jet in plume) { jet.localPosition = new Vector3((n++ == 0 ? -.25f : .25f), 0, -.55f); }
+        }
         public void Restart()
         {
+            Assembly.Refuel();
+            CurrentThrust = 0;
             int home = settings.homeIndex;
             Target = Nearest = home;
             Pilot = new Helm();
@@ -144,10 +200,20 @@ namespace Kepler
             while (!Paused && !hud.IsMenuOpen && accumulator >= dt)
             {
                 previousRotation = Pilot.Rotation;
-                if (!Warping) Pilot.Tick(vessel, command, hud.IsOverlayOpen ? 0 : throttle.ReadValue<float>(), dt);
+                if (!Warping)
+                {
+                    double inertiaScale = math.max(.05, Assembly.Mass / 14000.0);
+                    double3 demand = Pilot.RequestedTorque(vessel, command, Assembly.RcsTorque, inertiaScale);
+                    double authority = Assembly.BurnRcs(math.csum(math.abs(demand)), dt);
+                    Pilot.Tick(vessel, command, hud.IsOverlayOpen ? 0 : throttle.ReadValue<float>(), dt,
+                               Assembly.RcsTorque, inertiaScale, authority);
+                }
                 for (int i = 0; i < previous.Length; i++)
                     previous[i] = World.Position[i];
-                World.Step(dt, Pilot.Forward * (Pilot.throttle * vessel.engine.thrustNewtons / vessel.mass));
+                double fuelBefore = Assembly.Fuel;
+                double acceleration = Warping ? 0 : Assembly.Burn(Pilot.throttle, dt);
+                CurrentThrust = dt > 0 && Assembly.Flow > 0 ? (fuelBefore - Assembly.Fuel) / dt * Assembly.Thrust / Assembly.Flow : 0;
+                World.Step(dt, Pilot.Forward * acceleration);
                 bool wasWarping = Warping;
                 if (wasWarping) AdvanceWarp(dt);
                 accumulator -= dt;
@@ -170,7 +236,7 @@ namespace Kepler
             double alpha = Impact ? 1 : accumulator / dt;
             ship.SetPositionAndRotation(Vector3.zero,
                                         Quaternion.Slerp(previousRotation, Pilot.Rotation, (float)alpha));
-            bool burning = Pilot.throttle > 0;
+            bool burning = CurrentThrust > 0 && !Warping;
             if (plume.gameObject.activeSelf != burning)
                 plume.gameObject.SetActive(burning);
             if (burning)

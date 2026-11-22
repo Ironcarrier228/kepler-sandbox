@@ -8,12 +8,16 @@ namespace Kepler
         public double4 q = new double4(0, 0, 0, 1);
         public double3 omega;
         public double throttle;
-        public void Tick(ShipData spec, double3 command, double lever, double dt)
+        public double3 RequestedTorque(ShipData spec, double3 command, double maxTorque, double inertiaScale)
+        {
+            double3 I = spec.inertia * inertiaScale;
+            return math.clamp(command * maxTorque - omega * I * spec.damping, -maxTorque, maxTorque);
+        }
+        public void Tick(ShipData spec, double3 command, double lever, double dt, double maxTorque, double inertiaScale, double available)
         {
             throttle = math.clamp(throttle + lever * dt * 0.6, 0, 1);
-            double3 I = spec.inertia;
-            double3 torque =
-                math.clamp(command * spec.torque - omega * I * spec.damping, -spec.torque, spec.torque);
+            double3 I = spec.inertia * inertiaScale;
+            double3 torque = RequestedTorque(spec, command, maxTorque, inertiaScale) * available;
             omega += (torque - math.cross(omega, I * omega)) / I * dt;
             double angle = math.length(omega) * dt;
             double3 v = math.normalizesafe(omega) * math.sin(angle * 0.5);

@@ -27,6 +27,21 @@ namespace Kepler.Editor
             foreach (string id in new[] { "Throttle", "Pitch", "Yaw", "Roll", "Cut", "View", "Target",
                                           "Restart", "Pause" })
                 Check(f.controls.FindAction("Flight/" + id, true).bindings.Count >= 2, id);
+            Check(f.modules != null && f.modules.Length >= 7, "Module catalogue");
+            var assembly = new ShipAssembly(f.modules);
+            var layout = new ShipLayout { modules = new System.Collections.Generic.List<string> { "cockpit", "tank-small", "engine-chemical", "rcs", "warp" } };
+            Check(assembly.Valid(layout), "Valid ship layout");
+            assembly.Apply(layout, false);
+            Check(assembly.HasWarp && assembly.RcsTorque > 0 && assembly.Capacity == 2500, "Module properties");
+            double initialMass = assembly.Mass;
+            double acceleration = assembly.Burn(1, 1);
+            double expectedFuel = assembly.Thrust / (330 * ShipAssembly.StandardGravity);
+            Check(math.abs((assembly.Capacity - assembly.Fuel) - expectedFuel) < 1e-8, "Engine fuel flow");
+            Check(math.abs(acceleration - 330 * ShipAssembly.StandardGravity * math.log(initialMass / assembly.Mass)) < 1e-8, "Rocket equation");
+            assembly.TakeFuel(assembly.Fuel);
+            Check(assembly.Burn(1, 1) == 0 && assembly.BurnRcs(1000, 1) == 0, "Empty tanks");
+            var bad = new ShipLayout { modules = new System.Collections.Generic.List<string> { "tank-small" } };
+            Check(!assembly.Valid(bad), "Missing cockpit accepted");
             var doc = f.hud.GetComponent<UIDocument>();
             Check(doc.panelSettings && doc.panelSettings.themeStyleSheet && doc.visualTreeAsset,
                   "HUD resources");

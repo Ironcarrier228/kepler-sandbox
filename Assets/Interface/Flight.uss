@@ -21,3 +21,9 @@ Button { background-color:rgb(25,49,60); color:rgb(222,242,242); border-width:0;
 .main-menu-title { font-size:22px; -unity-font-style:bold; color:rgb(109,231,207); margin-bottom:20px; white-space:normal; }
 .main-menu Button { margin-top:7px; padding:10px; }
 .main-menu Slider, .main-menu Toggle { margin-top:12px; margin-bottom:12px; }
+.part-row { flex-direction:row; align-items:center; min-height:30px; }
+.part-name { flex-grow:1; border-left-width:7px; padding-left:8px; }
+.part-row Button { margin:1px; padding:2px 7px; }
+.part-palette { flex-direction:row; flex-wrap:wrap; }
+.part-palette Button { margin:2px; padding:4px; }
+.design-stats { margin-top:8px; margin-bottom:8px; color:rgb(109,231,207); white-space:normal; }

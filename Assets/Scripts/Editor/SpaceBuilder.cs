@@ -246,6 +246,28 @@ namespace Kepler.Editor
             RenderSettings.ambientLight = new Color(.34f, .38f, .42f);
             return rig;
         }
+        static ModuleData[] ModuleCatalog()
+        {
+            ModuleData Part(string id, string label, ModuleKind kind, double mass, double fuel,
+                            double thrust, double isp, double torque, Color color)
+            {
+                var part = Asset<ModuleData>("Modules/" + id);
+                part.id = id; part.displayName = label; part.kind = kind; part.dryMass = mass;
+                part.fuelCapacity = fuel; part.thrust = thrust; part.specificImpulse = isp;
+                part.torque = torque; part.color = color;
+                EditorUtility.SetDirty(part);
+                return part;
+            }
+            return new[] {
+                Part("cockpit", "Кабина", ModuleKind.Cockpit, 3000, 0, 0, 0, 0, new Color(.65f,.8f,.85f)),
+                Part("tank-small", "Бак малый", ModuleKind.Tank, 500, 2500, 0, 0, 0, new Color(.74f,.76f,.78f)),
+                Part("tank-large", "Бак большой", ModuleKind.Tank, 1200, 9000, 0, 0, 0, new Color(.82f,.84f,.85f)),
+                Part("engine-chemical", "Химический двигатель", ModuleKind.Engine, 1800, 0, 180000, 330, 0, new Color(.8f,.4f,.18f)),
+                Part("engine-ion", "Ионный двигатель", ModuleKind.Engine, 400, 0, 3000, 2400, 0, new Color(.15f,.65f,.85f)),
+                Part("rcs", "Блок РСУ", ModuleKind.Rcs, 350, 0, 0, 0, 45000, new Color(.85f,.7f,.3f)),
+                Part("warp", "Варп-модуль", ModuleKind.Warp, 2000, 0, 0, 0, 0, new Color(.45f,.3f,.8f))
+            };
+        }
         [MenuItem("Tools/Build Space Game")]
         public static void Build()
         {
@@ -253,7 +275,7 @@ namespace Kepler.Editor
                 throw new InvalidOperationException("Выйдите из Play Mode перед сборкой.");
             if (!Application.isBatchMode && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return;
-            foreach (var p in new[] { "", "Bodies", "Materials", "Prefabs" })
+            foreach (var p in new[] { "", "Bodies", "Materials", "Prefabs", "Modules" })
                 Directory.CreateDirectory(Root + p);
             AssetDatabase.Refresh();
             Layers(out int distant, out int local);
@@ -262,6 +284,7 @@ namespace Kepler.Editor
             var f = Node("Flight computer").AddComponent<Flight>();
             f.settings = Asset<FlightSettings>("FlightSettings");
             f.vessel = Asset<ShipData>("PeregrineSpec");
+            f.modules = ModuleCatalog();
             f.vessel.engine = Asset<EngineData>("MainEngine");
             f.controls = Bindings();
             f.bodies = SolarCatalogue.Create();

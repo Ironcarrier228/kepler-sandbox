@@ -13,7 +13,11 @@ namespace Kepler
         VisualElement bar;
         Button pause, view;
         bool help;
-        VisualElement navigationMap, mapPlot, menu, settingsPanel, menuButtons;
+        VisualElement navigationMap, mapPlot, menu, settingsPanel, menuButtons, designerPanel;
+        ScrollView partsList;
+        Label designStats;
+        ShipLayout draft;
+        System.Collections.Generic.List<Button> paletteButtons;
         bool menuOpen = true, mapOpen;
         float mapYaw, mapPitch = 55, mapZoom = 1;
         Vector2 lastMapPointer;
@@ -61,7 +65,7 @@ namespace Kepler
         {
             menuOpen = open;
             menu.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-            if (open) { menuButtons.style.display = DisplayStyle.Flex; settingsPanel.style.display = DisplayStyle.None; }
+            if (open) { menuButtons.style.display = DisplayStyle.Flex; settingsPanel.style.display = DisplayStyle.None; designerPanel.style.display = DisplayStyle.None; }
         }
         void CloseMap()
         {
@@ -83,6 +87,7 @@ namespace Kepler
             menuButtons = new VisualElement();
             panel.Add(menuButtons);
             menuButtons.Add(new Button(() => SetMenu(false)) { text = "В полёт" });
+            menuButtons.Add(new Button(OpenDesigner) { text = "Конструктор корабля" });
             menuButtons.Add(new Button(() => { menuButtons.style.display = DisplayStyle.None; settingsPanel.style.display = DisplayStyle.Flex; }) { text = "Настройки" });
             menuButtons.Add(new Button(Application.Quit) { text = "Выход" });
             settingsPanel = new VisualElement();
@@ -102,7 +107,70 @@ namespace Kepler
             fullscreen.RegisterValueChangedCallback(e => { Screen.fullScreen = e.newValue; PlayerPrefs.SetInt("fullscreen", e.newValue ? 1 : 0); PlayerPrefs.Save(); });
             settingsPanel.Add(fullscreen);
             settingsPanel.Add(new Button(() => { settingsPanel.style.display = DisplayStyle.None; menuButtons.style.display = DisplayStyle.Flex; }) { text = "Назад" });
+            BuildDesigner(panel);
             SetMenu(true);
+        }
+        void OpenDesigner()
+        {
+            draft = new ShipLayout { modules = new System.Collections.Generic.List<string>(flight.Assembly.Layout.modules) };
+            menuButtons.style.display = DisplayStyle.None;
+            designerPanel.style.display = DisplayStyle.Flex;
+            RefreshDesigner();
+        }
+        void RefreshDesigner()
+        {
+            partsList.Clear();
+            for (int i = 0; i < draft.modules.Count; i++)
+            {
+                int index = i;
+                var part = flight.Assembly.Find(draft.modules[i]);
+                var row = new VisualElement();
+                row.AddToClassList("part-row");
+                var name = new Label((i == 0 ? "НОС  " : "      ") + part.displayName);
+                name.AddToClassList("part-name");
+                name.style.borderLeftColor = part.color;
+                row.Add(name);
+                if (i > 1) row.Add(new Button(() => { var old = draft.modules[index - 1]; draft.modules[index - 1] = draft.modules[index]; draft.modules[index] = old; RefreshDesigner(); }) { text = "↑" });
+                if (i > 0 && i < draft.modules.Count - 1) row.Add(new Button(() => { var old = draft.modules[index + 1]; draft.modules[index + 1] = draft.modules[index]; draft.modules[index] = old; RefreshDesigner(); }) { text = "↓" });
+                if (i > 0) row.Add(new Button(() => { draft.modules.RemoveAt(index); RefreshDesigner(); }) { text = "×" });
+                partsList.Add(row);
+            }
+            var preview = new ShipAssembly(flight.modules);
+            preview.Apply(draft, false);
+            double isp = preview.Flow > 0 ? preview.Thrust / preview.Flow / ShipAssembly.StandardGravity : 0;
+            designStats.text = $"Масса: {preview.Mass:N0} кг · топливо: {preview.Capacity:N0} кг\n" +
+                $"Тяга: {preview.Thrust/1000:F1} кН · Isp: {isp:F0} с · Δv: {preview.DeltaV:N0} м/с\n" +
+                $"РСУ: {preview.RcsTorque/1000:F0} кН·м · варп: {(preview.HasWarp ? "да" : "нет")}";
+            foreach (var b in paletteButtons) b.SetEnabled(draft.modules.Count < ShipAssembly.Limit);
+        }
+        void BuildDesigner(VisualElement parent)
+        {
+            designerPanel = new VisualElement();
+            designerPanel.style.display = DisplayStyle.None;
+            parent.Add(designerPanel);
+            designerPanel.Add(new Label("КОНСТРУКТОР · детали вдоль одной оси"));
+            designerPanel.Add(new Label("Добавляйте, удаляйте и меняйте порядок деталей. Кабина всегда впереди."));
+            partsList = new ScrollView();
+            partsList.style.height = 190;
+            designerPanel.Add(partsList);
+            var palette = new VisualElement();
+            palette.AddToClassList("part-palette");
+            designerPanel.Add(palette);
+            paletteButtons = new System.Collections.Generic.List<Button>();
+            foreach (var module in flight.modules)
+            {
+                if (module.kind == ModuleKind.Cockpit) continue;
+                string id = module.id;
+                var button = new Button(() => { if (draft.modules.Count < ShipAssembly.Limit) { draft.modules.Add(id); RefreshDesigner(); } }) { text = "+ " + module.displayName };
+                palette.Add(button);
+                paletteButtons.Add(button);
+            }
+            designStats = new Label();
+            designStats.AddToClassList("design-stats");
+            designerPanel.Add(designStats);
+            designerPanel.Add(new Label("Применение сохранит проект и начнёт полёт заново с полными баками."));
+            designerPanel.Add(new Button(() => { if (flight.Assembly.Valid(draft)) { flight.ApplyLayout(draft); designerPanel.style.display = DisplayStyle.None; menuButtons.style.display = DisplayStyle.Flex; SetMenu(false); } }) { text = "Сохранить и начать полёт" });
+            designerPanel.Add(new Button(() => { designerPanel.style.display = DisplayStyle.None; menuButtons.style.display = DisplayStyle.Flex; }) { text = "Отмена" });
         }
         void BuildMap(VisualElement screen)
         {
@@ -227,7 +295,9 @@ namespace Kepler
             warpInfo.text = f.Warping
                 ? $"ВАРП → {f.bodies[f.Target].displayName} · осталось {f.WarpRemaining:F1} с"
                 : $"Цель: {f.bodies[f.Target].displayName} · до центра {range/1000:N0} км · примерное время {range/Flight.WarpSpeed:F1} с";
-            warpButton.SetEnabled(!f.Warping && !f.Paused && !f.Impact);
+            if (!f.Warping)
+                warpInfo.text += $"\nВарп-модуль: {(f.Assembly.HasWarp ? "установлен" : "не установлен")} · нужно топлива {f.WarpFuelCost(f.Target):N1} кг";
+            warpButton.SetEnabled(f.CanWarp);
         }
         void Refresh(Flight f)
         {
@@ -240,7 +310,7 @@ namespace Kepler
             height.text = $"Высота     {f.Altitude/1000:N1} км";
             speed.text = $"Скорость     {math.distance(w.Velocity[i],w.Velocity[k]):N1} м/с";
             power.text =
-                $"Тяга     {f.Pilot.throttle*f.vessel.engine.thrustNewtons/1000:F1} кН   /   {100*f.Pilot.throttle:F0}%";
+                $"Тяга {f.CurrentThrust/1000:F1} кН / {100*f.Pilot.throttle:F0}%\nТопливо {f.Assembly.Fuel:N0} / {f.Assembly.Capacity:N0} кг\nМасса {f.Assembly.Mass:N0} кг · Δv {f.Assembly.DeltaV:N0} м/с";
             bar.style.width = Length.Percent((float)f.Pilot.throttle * 100);
             target.text = f.bodies[t].displayName;
             range.text = $"До центра   {math.distance(w.Position[k],w.Position[t])/1000:N0} км";

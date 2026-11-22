@@ -22,6 +22,49 @@ namespace Kepler
         public bool Paused { get; private set; }
         public bool Impact { get; private set; }
         public double Clock { get; private set; }
+        // Gameplay-only warp speed, not an implementation of relativity.
+        public const double WarpSpeed = 10000000000.0;
+        public bool Warping { get; private set; }
+        public double WarpDuration { get; private set; }
+        public double WarpElapsed { get; private set; }
+        public double WarpRemaining => math.max(0, WarpDuration - WarpElapsed);
+        int warpTarget;
+        double3 warpStart, warpDirection;
+        public void SelectTarget(int index)
+        {
+            if (index >= 0 && index < Craft && !Warping) Target = index;
+        }
+        public bool StartWarp()
+        {
+            if (Warping || Paused || Impact) return false;
+            warpTarget = Target;
+            warpStart = World.Position[Craft];
+            warpDirection = math.normalizesafe(warpStart - World.Position[warpTarget], new double3(1, 0, 0));
+            double3 destination = WarpDestination();
+            WarpDuration = math.max(settings.stepSeconds, math.distance(warpStart, destination) / WarpSpeed);
+            WarpElapsed = 0;
+            Pilot.throttle = 0;
+            Warping = true;
+            return true;
+        }
+        double3 WarpDestination() => World.Position[warpTarget] + warpDirection *
+            (bodies[warpTarget].radius + math.max(420000.0, bodies[warpTarget].radius * 0.1));
+        void AdvanceWarp(double dt)
+        {
+            WarpElapsed = math.min(WarpDuration, WarpElapsed + dt);
+            World.Position[Craft] = math.lerp(warpStart, WarpDestination(), WarpElapsed / WarpDuration);
+            if (WarpElapsed >= WarpDuration)
+            {
+                // Place the craft on a circular orbit in a plane perpendicular to its arrival radius.
+                double3 tangent = math.normalizesafe(math.cross(new double3(0, 1, 0), warpDirection));
+                if (math.lengthsq(tangent) < 0.5) tangent = math.normalize(math.cross(new double3(1, 0, 0), warpDirection));
+                double radius = math.distance(World.Position[Craft], World.Position[warpTarget]);
+                World.Velocity[Craft] = World.Velocity[warpTarget] + tangent *
+                    math.sqrt(InitialOrbit.G * bodies[warpTarget].mass / radius);
+                Warping = false;
+            }
+            World.SampleGravity();
+        }
         public double Altitude =>
             math.distance(World.Position[Craft], World.Position[Nearest]) - bodies[Nearest].radius;
         Quaternion previousRotation;
@@ -68,12 +111,12 @@ namespace Kepler
                 previous[i] = World.Position[i];
             World.SampleGravity();
             Clock = accumulator = 0;
-            Paused = Impact = false;
+            Paused = Impact = Warping = false;
             rig.ResetView();
         }
         public void NextTarget()
         {
-            Target = (Target + 1) % Craft;
+            if (!Warping) Target = (Target + 1) % Craft;
         }
         public void TogglePause()
         {
@@ -100,10 +143,12 @@ namespace Kepler
             while (!Paused && accumulator >= dt)
             {
                 previousRotation = Pilot.Rotation;
-                Pilot.Tick(vessel, command, throttle.ReadValue<float>(), dt);
+                if (!Warping) Pilot.Tick(vessel, command, throttle.ReadValue<float>(), dt);
                 for (int i = 0; i < previous.Length; i++)
                     previous[i] = World.Position[i];
                 World.Step(dt, Pilot.Forward * (Pilot.throttle * vessel.engine.thrustNewtons / vessel.mass));
+                bool wasWarping = Warping;
+                if (wasWarping) AdvanceWarp(dt);
                 accumulator -= dt;
                 Clock += dt;
                 double min = double.MaxValue;
@@ -116,7 +161,7 @@ namespace Kepler
                         min = h;
                     }
                 }
-                if (min <= 0)
+                if (min <= 0 && !wasWarping)
                 {
                     Paused = Impact = true;
                 }

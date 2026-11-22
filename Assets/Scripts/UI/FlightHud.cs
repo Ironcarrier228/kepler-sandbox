@@ -12,6 +12,10 @@ namespace Kepler
         VisualElement bar;
         Button pause, view;
         bool help;
+        VisualElement navigationMap, mapPlot;
+        Label warpInfo;
+        Button warpButton;
+        VisualElement[] mapMarkers;
         void Start()
         {
             var root = GetComponent<UIDocument>().rootVisualElement;
@@ -33,11 +37,83 @@ namespace Kepler
             root.Q<Button>("reset").clicked += flight.Restart;
             root.Q<Button>("help").clicked += () =>
             { help = !help; };
+            BuildMap(root.Q("screen"));
             Refresh(flight);
             root.schedule.Execute(() => Refresh(flight)).Every(200);
         }
+        void BuildMap(VisualElement screen)
+        {
+            var open = new Button(() => navigationMap.style.display = DisplayStyle.Flex) { text = "Карта" };
+            screen.Q("next").parent.Add(open);
+            navigationMap = new VisualElement();
+            navigationMap.AddToClassList("map-window");
+            navigationMap.style.display = DisplayStyle.None;
+            screen.Add(navigationMap);
+            var heading = new VisualElement();
+            heading.AddToClassList("map-header");
+            heading.Add(new Label("КАРТА СОЛНЕЧНОЙ СИСТЕМЫ"));
+            heading.Add(new Button(() => navigationMap.style.display = DisplayStyle.None) { text = "Закрыть" });
+            navigationMap.Add(heading);
+            navigationMap.Add(new Label("Вид сверху · логарифмический масштаб · выберите цель из списка"));
+            mapPlot = new VisualElement();
+            mapPlot.AddToClassList("map-plot");
+            navigationMap.Add(mapPlot);
+            mapMarkers = new VisualElement[flight.Craft + 1];
+            for (int i = 0; i < mapMarkers.Length; i++)
+            {
+                var marker = new Label(i == flight.Craft ? "▲" : "●");
+                marker.AddToClassList("map-marker");
+                marker.style.color = i == flight.Craft ? Color.white : flight.bodies[i].tint;
+                mapPlot.Add(marker);
+                mapMarkers[i] = marker;
+            }
+            var choices = new VisualElement();
+            choices.AddToClassList("map-choices");
+            for (int i = 0; i < flight.Craft; i++)
+            {
+                int index = i;
+                choices.Add(new Button(() => flight.SelectTarget(index)) { text = flight.bodies[i].displayName });
+            }
+            navigationMap.Add(choices);
+            warpInfo = new Label();
+            warpInfo.AddToClassList("warp-info");
+            navigationMap.Add(warpInfo);
+            warpButton = new Button(() => flight.StartWarp()) { text = "Запустить тестовый варп" };
+            navigationMap.Add(warpButton);
+        }
+        void RefreshMap(Flight f)
+        {
+            if (navigationMap.resolvedStyle.display == DisplayStyle.None) return;
+            float width = mapPlot.resolvedStyle.width, height = mapPlot.resolvedStyle.height;
+            if (width > 0 && height > 0)
+            {
+                // Logarithmic radial projection keeps inner planets visible beside Neptune.
+                double max = 1;
+                for (int i = 0; i <= f.Craft; i++)
+                {
+                    var p = f.World.Position[i] - f.World.Position[0];
+                    max = math.max(max, math.length(new double2(p.x, p.z)));
+                }
+                double denom = math.log(1 + max / 1e9);
+                for (int i = 0; i <= f.Craft; i++)
+                {
+                    var p = f.World.Position[i] - f.World.Position[0];
+                    var d = new double2(p.x, p.z);
+                    double r = math.length(d);
+                    var v = r > 0 ? d / r * (math.log(1 + r / 1e9) / denom) : double2.zero;
+                    mapMarkers[i].style.left = (float)(width * .5 + v.x * (width * .46)) - 6;
+                    mapMarkers[i].style.top = (float)(height * .5 - v.y * (height * .46)) - 8;
+                }
+            }
+            double range = math.distance(f.World.Position[f.Craft], f.World.Position[f.Target]);
+            warpInfo.text = f.Warping
+                ? $"ВАРП → {f.bodies[f.Target].displayName} · осталось {f.WarpRemaining:F1} с"
+                : $"Цель: {f.bodies[f.Target].displayName} · до центра {range/1000:N0} км · примерное время {range/Flight.WarpSpeed:F1} с";
+            warpButton.SetEnabled(!f.Warping && !f.Paused && !f.Impact);
+        }
         void Refresh(Flight f)
         {
+            RefreshMap(f);
             // Text formatting is throttled to 5 Hz, independent of render/physics rates.
             int i = f.Nearest, t = f.Target, k = f.Craft;
             var w = f.World;

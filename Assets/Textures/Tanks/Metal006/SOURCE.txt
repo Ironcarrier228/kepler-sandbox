@@ -1,0 +1,5 @@
+Metal006 1K JPG — ambientCG (https://ambientcg.com/a/Metal006)
+License: CC0 1.0 Universal: https://docs.ambientcg.com/license/
+Downloaded from the copy in https://github.com/jackwherb13/TwentyHours/tree/2695ee0d22e2f4e94be33c35d2458ffecb78b8ac/art/materials/pbr_src/Metal006
+Source files renamed locally without alteration: Color, NormalGL, Metalness, Roughness.
+Metal006_MetallicSmoothness.png is derived from Metalness and Roughness: RGB = Metalness, A = 255 - Roughness; for the Unity URP metallic workflow. No separate AO map was supplied.

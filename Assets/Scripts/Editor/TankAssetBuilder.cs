@@ -9,11 +9,35 @@ namespace Kepler.Editor
     public static class TankAssetBuilder
     {
         const string Root = "Assets/KeplerGenerated/Tanks/";
+        const string TextureRoot = "Assets/Textures/Tanks/Metal006/";
+        static Texture2D colorMap, normalMap, metallicMap;
+        static Texture2D LoadTexture(string filename, bool normal, bool srgb)
+        {
+            string path = TextureRoot + filename;
+            var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+            if (!importer) throw new System.IO.FileNotFoundException("Missing tank PBR map", path);
+            var type = normal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            if (importer.textureType != type || importer.sRGBTexture != srgb || importer.wrapMode != TextureWrapMode.Repeat ||
+                (!normal && filename.EndsWith(".png") && importer.alphaSource != TextureImporterAlphaSource.FromInput))
+            {
+                importer.textureType = type;
+                importer.sRGBTexture = srgb;
+                importer.wrapMode = TextureWrapMode.Repeat;
+                if (!normal && filename.EndsWith(".png")) importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                importer.SaveAndReimport();
+            }
+            var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            if (!texture) throw new System.IO.FileNotFoundException("Failed to import tank PBR map", path);
+            return texture;
+        }
         [MenuItem("Tools/Build Tank Prototypes")]
         public static void Build()
         {
             Directory.CreateDirectory(Root);
             AssetDatabase.Refresh();
+            colorMap = LoadTexture("Metal006_Color.jpg", false, true);
+            normalMap = LoadTexture("Metal006_NormalGL.jpg", true, false);
+            metallicMap = LoadTexture("Metal006_MetallicSmoothness.png", false, false);
             Make("cylinder", "Цилиндрический бак", TankShape.Cylinder, 1.1f, 3.6f, 900, 8500, new Color(.68f, .71f, .73f), .8f);
             Make("sphere", "Сферический бак", TankShape.Sphere, .9f, 1.8f, 450, 2500, new Color(.72f, .74f, .76f), .7f);
             Make("domed", "Бак с куполами", TankShape.Domed, 1.2f, 4.8f, 1200, 12000, new Color(.65f, .34f, .12f), .05f);
@@ -46,9 +70,15 @@ namespace Kepler.Editor
                 material = new Material(shader);
                 AssetDatabase.CreateAsset(material, path + ".mat");
             }
-            material.SetColor("_BaseColor", color);
-            material.SetFloat("_Metallic", metallic);
-            material.SetFloat("_Smoothness", .48f);
+            bool foam = shape == TankShape.Domed;
+            material.SetColor("_BaseColor", foam ? color : Color.white);
+            material.SetFloat("_Metallic", foam ? metallic : 1f);
+            material.SetFloat("_Smoothness", foam ? .48f : 1f);
+            material.SetTexture("_BaseMap", foam ? null : colorMap);
+            material.SetTexture("_BumpMap", foam ? null : normalMap);
+            material.SetTexture("_MetallicGlossMap", foam ? null : metallicMap);
+            if (foam) { material.DisableKeyword("_NORMALMAP"); material.DisableKeyword("_METALLICSPECGLOSSMAP"); }
+            else { material.EnableKeyword("_NORMALMAP"); material.EnableKeyword("_METALLICSPECGLOSSMAP"); }
             EditorUtility.SetDirty(material);
             var meshes = new Mesh[3];
             meshes[0] = SaveMesh(path + "-lod0.asset", TankMesh.Create(shape, radius, height, 48, 12));

@@ -36,6 +36,14 @@ namespace Kepler.Editor
                 var lod = tank.prefab.GetComponent<LODGroup>();
                 var collider = tank.prefab.GetComponent<MeshCollider>();
                 Check(lod != null && lod.GetLODs().Length == 3, "Tank LODs " + tankId);
+                if (tankId != "domed")
+                {
+                    var mat = tank.prefab.GetComponentInChildren<MeshRenderer>().sharedMaterial;
+                    Check(mat && mat.GetTexture("_BaseMap") && mat.GetTexture("_BumpMap") &&
+                          mat.GetTexture("_MetallicGlossMap"), "Tank PBR maps " + tankId);
+                    Check(mat.IsKeywordEnabled("_NORMALMAP") && mat.IsKeywordEnabled("_METALLICSPECGLOSSMAP"),
+                          "Tank PBR keywords " + tankId);
+                }
                 Check(collider != null && collider.convex && collider.sharedMesh != null, "Tank collider " + tankId);
                 Check(tank.prefab.GetComponentsInChildren<Kepler.Parts.AttachNode>().Length == 6,
                       "Tank attachment nodes " + tankId);

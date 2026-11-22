@@ -348,6 +348,7 @@ namespace Kepler.Editor
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) }
                                              .Concat(EditorBuildSettings.scenes.Where(x => x.path != ScenePath))
                                              .ToArray();
+            TankAssetBuilder.Build();
             AssetDatabase.SaveAssets();
             Selection.activeObject = f.gameObject;
             Debug.Log("Kepler: SolarFlight готова. Нажмите Play.");

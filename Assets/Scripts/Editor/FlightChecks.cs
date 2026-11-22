@@ -27,6 +27,21 @@ namespace Kepler.Editor
             foreach (string id in new[] { "Throttle", "Pitch", "Yaw", "Roll", "Cut", "View", "Target",
                                           "Restart", "Pause" })
                 Check(f.controls.FindAction("Flight/" + id, true).bindings.Count >= 2, id);
+            foreach (string tankId in new[] { "cylinder", "sphere", "domed", "rcs-bottle" })
+            {
+                var tank = AssetDatabase.LoadAssetAtPath<Kepler.Parts.TankDefinition>(
+                    "Assets/KeplerGenerated/Tanks/" + tankId + ".asset");
+                Check(tank != null && tank.prefab != null && tank.volumeM3 > 0 && tank.dryMassKg > 0,
+                      "Tank definition " + tankId);
+                var lod = tank.prefab.GetComponent<LODGroup>();
+                var collider = tank.prefab.GetComponent<MeshCollider>();
+                Check(lod != null && lod.GetLODs().Length == 3, "Tank LODs " + tankId);
+                Check(collider != null && collider.convex && collider.sharedMesh != null, "Tank collider " + tankId);
+                Check(tank.prefab.GetComponentsInChildren<Kepler.Parts.AttachNode>().Length == 6,
+                      "Tank attachment nodes " + tankId);
+            }
+            double sphereVolume = Kepler.Rendering.TankMesh.Volume(Kepler.Parts.TankShape.Sphere, 1, 2);
+            Check(math.abs(sphereVolume - 4 * System.Math.PI / 3) < 1e-12, "Tank sphere volume");
             Check(f.modules != null && f.modules.Length >= 7, "Module catalogue");
             var assembly = new ShipAssembly(f.modules);
             var layout = new ShipLayout { modules = new System.Collections.Generic.List<string> { "cockpit", "tank-small", "engine-chemical", "rcs", "warp" } };

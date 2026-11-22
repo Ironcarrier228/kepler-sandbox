@@ -125,25 +125,26 @@ namespace Kepler
         }
         void Update()
         {
-            if (reset.WasPressedThisFrame())
+            if (!hud.IsOverlayOpen && reset.WasPressedThisFrame())
                 Restart();
-            if (pause.WasPressedThisFrame())
+            if (!hud.IsOverlayOpen && pause.WasPressedThisFrame())
                 TogglePause();
-            if (target.WasPressedThisFrame())
+            if (!hud.IsOverlayOpen && target.WasPressedThisFrame())
                 NextTarget();
-            if (view.WasPressedThisFrame())
+            if (!hud.IsOverlayOpen && view.WasPressedThisFrame())
                 rig.SwitchView();
-            if (cut.WasPressedThisFrame())
+            if (!hud.IsOverlayOpen && cut.WasPressedThisFrame())
                 Pilot.throttle = 0;
             double dt = settings.stepSeconds;
-            if (!Paused)
+            if (!Paused && !hud.IsMenuOpen)
                 accumulator = math.min(accumulator + Time.unscaledDeltaTime, dt * settings.maxStepsPerFrame);
             double3 command =
+                hud.IsOverlayOpen ? double3.zero :
                 new double3(pitch.ReadValue<float>(), yaw.ReadValue<float>(), roll.ReadValue<float>());
-            while (!Paused && accumulator >= dt)
+            while (!Paused && !hud.IsMenuOpen && accumulator >= dt)
             {
                 previousRotation = Pilot.Rotation;
-                if (!Warping) Pilot.Tick(vessel, command, throttle.ReadValue<float>(), dt);
+                if (!Warping) Pilot.Tick(vessel, command, hud.IsOverlayOpen ? 0 : throttle.ReadValue<float>(), dt);
                 for (int i = 0; i < previous.Length; i++)
                     previous[i] = World.Position[i];
                 World.Step(dt, Pilot.Forward * (Pilot.throttle * vessel.engine.thrustNewtons / vessel.mass));

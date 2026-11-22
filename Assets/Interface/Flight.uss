@@ -16,3 +16,8 @@ Button { background-color:rgb(25,49,60); color:rgb(222,242,242); border-width:0;
 .map-marker { position:absolute; font-size:16px; -unity-font-style:bold; }
 .map-choices { flex-direction:row; flex-wrap:wrap; }
 .warp-info { margin-top:6px; color:rgb(109,231,207); white-space:normal; }
+.main-menu { position:absolute; left:0; right:0; top:0; bottom:0; align-items:center; justify-content:center; background-color:rgba(5,12,21,0.96); }
+.main-menu-panel { width:420px; max-width:90%; padding:28px; background-color:rgb(13,31,42); border-left-width:3px; border-left-color:rgb(83,215,192); }
+.main-menu-title { font-size:22px; -unity-font-style:bold; color:rgb(109,231,207); margin-bottom:20px; white-space:normal; }
+.main-menu Button { margin-top:7px; padding:10px; }
+.main-menu Slider, .main-menu Toggle { margin-top:12px; margin-bottom:12px; }

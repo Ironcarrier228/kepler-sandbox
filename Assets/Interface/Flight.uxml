@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
  <ui:VisualElement name="screen" picking-mode="Ignore">
-  <ui:VisualElement class="header"><ui:VisualElement><ui:Label class="kicker" text="K E P L E R   /   F L I G H T   L A B"/><ui:Label class="title" text="Орбитальная станция управления"/></ui:VisualElement><ui:Label name="clock" class="clock"/></ui:VisualElement>
+  <ui:VisualElement class="header"><ui:Label name="clock" class="clock"/></ui:VisualElement>
   <ui:Label class="reticle" text="·" picking-mode="Ignore"/>
   <ui:VisualElement class="row bottom"><ui:VisualElement class="panel telemetry"><ui:Label class="kicker" text="01    /    ТЕЛЕМЕТРИЯ"/><ui:Label name="place" class="name"/><ui:Label name="height"/><ui:Label name="speed"/><ui:Label name="power"/><ui:VisualElement class="track"><ui:VisualElement name="bar"/></ui:VisualElement></ui:VisualElement>
   <ui:VisualElement class="panel navigation"><ui:Label class="kicker" text="02    /    НАВИГАЦИЯ"/><ui:Label name="target" class="name"/><ui:Label name="range"/><ui:VisualElement class="row"><ui:Button name="next" text="Цель  ›"/><ui:Button name="view" text="Обзор"/></ui:VisualElement></ui:VisualElement></ui:VisualElement>

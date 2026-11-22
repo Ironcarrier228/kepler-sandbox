@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 namespace Kepler
 {
     public sealed class FlightRig : MonoBehaviour
@@ -8,9 +9,13 @@ namespace Kepler
         public Camera distant, local;
         public Light sun;
         public bool Survey { get; private set; }
+        float orbitYaw, orbitPitch, distance = 10f;
+        public float MouseSensitivity { get; set; } = 0.18f;
         public void ResetView()
         {
             Survey = false;
+            orbitYaw = orbitPitch = 0;
+            distance = 10f;
         }
         public void SwitchView()
         {
@@ -18,17 +23,28 @@ namespace Kepler
         }
         public void RenderFrame(Flight f)
         {
-            Quaternion rot = f.ship.rotation;
-            Vector3 pos = rot * new Vector3(0, 2.6f, -10);
+            var mouse = Mouse.current;
+            if (mouse != null && !f.hud.IsOverlayOpen)
+            {
+                if (mouse.rightButton.isPressed)
+                {
+                    Vector2 delta = mouse.delta.ReadValue();
+                    orbitYaw += delta.x * MouseSensitivity;
+                    orbitPitch = Mathf.Clamp(orbitPitch - delta.y * MouseSensitivity, -80f, 80f);
+                }
+                float scroll = mouse.scroll.ReadValue().y;
+                if (scroll != 0) distance = Mathf.Clamp(distance * Mathf.Exp(-scroll * .001f), 4f, 80f);
+            }
+            Quaternion rot = f.ship.rotation * Quaternion.Euler(orbitPitch + 8, orbitYaw, 0);
+            Vector3 pos = rot * new Vector3(0, 2.6f, -distance);
             if (Survey)
             {
                 var dir = f.globes[f.Target].position;
                 if (dir.sqrMagnitude > 0)
-                    rot = Quaternion.LookRotation(dir, rot * Vector3.up);
+                    rot = Quaternion.LookRotation(dir, f.ship.up) * Quaternion.Euler(orbitPitch, orbitYaw, 0);
                 pos = rot * new Vector3(0, 0, 6);
             }
-            else
-                rot *= Quaternion.Euler(8, 0, 0);
+
             local.transform.SetPositionAndRotation(pos, rot);
             distant.transform.SetPositionAndRotation(pos * (float)Scale, rot);
             // Tighten the depth range, especially on GPUs without reversed Z.

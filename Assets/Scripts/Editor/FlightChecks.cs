@@ -40,6 +40,20 @@ namespace Kepler.Editor
                 Check(tank.prefab.GetComponentsInChildren<Kepler.Parts.AttachNode>().Length == 6,
                       "Tank attachment nodes " + tankId);
             }
+            var cylinder = AssetDatabase.LoadAssetAtPath<Kepler.Parts.TankDefinition>("Assets/KeplerGenerated/Tanks/cylinder.asset");
+            var sphere = AssetDatabase.LoadAssetAtPath<Kepler.Parts.TankDefinition>("Assets/KeplerGenerated/Tanks/sphere.asset");
+            var graph = new Kepler.Builder.ConstructionGraph(new[] { cylinder, sphere });
+            Check(graph.AddRoot("cylinder"), "Builder root");
+            var rootId = graph.Snapshot().parts[0].instanceId;
+            Check(graph.Attach(rootId, "top", "sphere", "bottom"), "Builder attachment");
+            Check(!graph.Attach(rootId, "top", "sphere", "bottom"), "Occupied node");
+            var child = graph.Snapshot().parts[1];
+            Check(math.abs(child.position.y - (cylinder.height + sphere.height) * .5f) < 1e-5, "Attachment alignment");
+            string savedGraph = graph.ToJson();
+            Check(!graph.LoadJson("{\"version\":2,\"parts\":[]}") && graph.Count == 2, "Invalid graph transaction");
+            Check(graph.Undo() && graph.Count == 1 && graph.Redo() && graph.Count == 2, "Graph undo redo");
+            Check(graph.Remove(rootId) && graph.Count == 0 && graph.LoadJson(savedGraph) && graph.Count == 2,
+                  "Graph cascade removal and load");
             double sphereVolume = Kepler.Rendering.TankMesh.Volume(Kepler.Parts.TankShape.Sphere, 1, 2);
             Check(math.abs(sphereVolume - 4 * System.Math.PI / 3) < 1e-12, "Tank sphere volume");
             Check(f.modules != null && f.modules.Length >= 7, "Module catalogue");
